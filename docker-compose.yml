@@ -1,0 +1,66 @@
+version: '3'
+
+services:
+    tsdb:
+        image: timescale/timescaledb:latest-pg11
+        environment:
+            POSTGRES_PASSWORD: password
+        volumes:
+            - tsdb-demo-data:/var/lib/postgresql/data
+
+    pgadmin:
+        restart: always
+        image: dpage/pgadmin4:4.25
+        environment:
+            PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-postgres}
+            PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-postgres}
+            PGADMIN_LISTEN_PORT:  ${PGADMIN_LISTEN_PORT:-5051}
+            PGADMIN_CONFIG_CSRF_ENABLED: "False"
+        volumes:
+            - pgadmin-demo-data:/root/.pgadmin
+            - ./src/pgadmin/servers.json:/pgadmin4/servers.json
+
+    grafana:
+        restart: always
+        build: 
+            context: ./src/grafana
+            dockerfile:  Dockerfile
+            args:
+                GF_INSTALL_PLUGINS:
+        environment: 
+            - GF_SERVER_DOMAIN=zdm-data.consoles.zerynth.com
+            - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana
+            - GF_SERVER_SERVE_FROM_SUB_PATH=true
+        volumes:
+            - grafana-demo-data:/var/lib/grafana
+            - ./src/grafana/provisioning/dashboards:/var/lib/grafana/dashboards/
+
+    ingestion:
+        build:
+            context: ./src/ingestion
+            dockerfile: Dockerfile
+        environment:
+            SERVER_PORT: ":8080"
+            TS_HOST: "tsdb"
+            TS_PORT: "5432"
+            TS_NAME: "postgres"
+            TS_USER: "postgres"
+            TS_PASSWORD: "password"
+   
+    migration:
+        build:
+            context: ./src/migrate
+            dockerfile:  Dockerfile
+        environment:
+            - DOCKERIZE_FLAGS=-timeout 1m -wait-retry-interval 5s -wait tcp://tsdb:5432
+        volumes:
+            - ./src/migrate/migrations:/db
+    nginx:
+        restart: always
+        build: ./src/nginx
+        ports:
+            - "0.0.0.0:80:80"
+volumes:
+    tsdb-demo-data:
+    grafana-demo-data:
+    pgadmin-demo-data:

@@ -1,0 +1,15 @@
+#automatically adds the correct datasource to grafana
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    type: postgres
+    url: tsdb
+    database: postgres
+    user: postgres
+    isDefault: true
+    secureJsonData:
+      password: password
+    jsonData:
+      sslmode: disable
+    editable: false
